@@ -25,6 +25,9 @@
    <layout class="QGridLayout" name="mainGrid">
     <item row="1" column="1">
      <widget class="QCheckBox" name="recursiveCheck">
+      <property name="toolTip">
+       <string>Recursively get every page that is linked to any page linked to any page linked.....</string>
+      </property>
       <property name="text">
        <string>Recursive</string>
       </property>
@@ -53,7 +56,7 @@
     <item row="1" column="0">
      <widget class="QLineEdit" name="searchTerm">
       <property name="statusTip">
-       <string>Enter Wikipedia Search Term</string>
+       <string/>
       </property>
       <property name="whatsThis">
        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search Box&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -65,6 +68,9 @@
     </item>
     <item row="2" column="0" colspan="3">
      <widget class="QTabWidget" name="tabsSummaryLinkList">
+      <property name="toolTip">
+       <string>Links to all the wikipedia pages that will be downloaded along with the initial one</string>
+      </property>
       <property name="currentIndex">
        <number>0</number>
       </property>
@@ -155,6 +161,9 @@ p, li { white-space: pre-wrap; }
     </item>
     <item row="3" column="2">
      <widget class="QPushButton" name="saveFilesButton">
+      <property name="toolTip">
+       <string>Save Database</string>
+      </property>
       <property name="text">
        <string>Go</string>
       </property>
