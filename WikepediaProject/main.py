@@ -126,8 +126,11 @@ class TaskThread(QtCore.QThread):
         summaryPath = directoryPath + "/summary"
         imagesPath = directoryPath + "/images"
         fullPagePath = directoryPath + "/fullPage"
+        htmlPath = directoryPath + "/HTML"
         if not os.path.exists(summaryPath):
             os.mkdir(summaryPath)
+        if not os.path.exists(htmlPath):
+            os.mkdir(htmlPath)
         if not os.path.exists(imagesPath):
             os.mkdir(imagesPath)
         if not os.path.exists(fullPagePath):
@@ -143,6 +146,7 @@ class TaskThread(QtCore.QThread):
                 page = wikipedia.page(e.options[0])
             summary = page.summary
             fullPage = page.content
+            htmlDoc = page.
             forPathUse = i.replace('/', 'slashForReplacement')
             for key in self.illegalChar:
                 forPathUse = forPathUse.replace(key, self.illegalChar[key])
@@ -161,15 +165,19 @@ class TaskThread(QtCore.QThread):
                             if fileName.split('.')[-1] in self.imgTypes:
                                 headers = {
                                     'User-Agent': 'EvanCategoryWikiBot/2.0 (boomandot@gmail.com; coolbot@example.org)'}
-                                with open(tempImagesPath + '/' + fileName, 'wb') as f:
-                                    r = requests.get(a, stream=True, headers=headers)
-                                    r.raw.decode_content = True
-                                    if (r.status_code == 200):
-                                        shutil.copyfileobj(r.raw, f)
-                                f.close()
+                                try:
+                                    with open(tempImagesPath + '/' + fileName, 'wb') as f:
+                                        r = requests.get(a, stream=True, headers=headers)
+                                        r.raw.decode_content = True
+                                        if (r.status_code == 200):
+                                            shutil.copyfileobj(r.raw, f)
+                                    f.close()
+                                except OSError as e:
+                                    print(e)
 
             tempSummaryPath = summaryPath + '/' + forPathUse + '.txt'
             tempFullPagePath = fullPagePath + '/' + forPathUse + '.txt'
+            tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
             with open(tempSummaryPath, 'w') as f:
                 f.write(ascii(summary))
                 f.close()
