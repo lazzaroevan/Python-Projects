@@ -27,7 +27,7 @@ class WikipediaLinkGetter(QWidget):
         self.filePathLabel.setToolTip(fname)
 
     def saveDatabase(self):
-        numLinks = self.links.__sizeof__()
+        numLinks = len(self.links)
         print(numLinks)
         self.progressBar.setRange(0, numLinks)
         self.thread = TaskThread(self.links,self.filePathLabel.text(),self.picturesCheck.isChecked())
