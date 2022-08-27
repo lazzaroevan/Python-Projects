@@ -45,7 +45,7 @@ class WikipediaLinkGetter(QWidget):
         brush.setStyle(Qt.BrushStyle.SolidPattern)
         self.listOfLinksBox.item(self.progressBar.value()).setBackground(brush)
         self.progressBar.setValue(num + int(self.progressBar.value()))
-        self.progressTracker.setText(str(self.progressBar.value())+'/'+str(self.links.__sizeof__()))
+        self.progressTracker.setText(str(self.progressBar.value())+'/'+str(len(self.links)))
 
     def searchWikipedia(self):
         self.listOfLinksBox.clear()
@@ -136,9 +136,10 @@ class TaskThread(QtCore.QThread):
         if not os.path.exists(fullPagePath):
             os.mkdir(fullPagePath)
         self.imgTypes = ['bmp', 'jpeg', 'tiff', 'tif', '.gif', 'png', 'jpg']
-        self.illegalChar = {'<': 'greaterThanReplace', '>': 'lessThanReplace', ':': 'colonReplace',
-                            '\"': 'doubleQuoteReplace', '/': 'forwardSlashReplace', '\\': 'backslashReplace',
-                            '|': 'pipeReplace', '?': 'questionMarkReplace', '*': 'asteriskReplace'}
+        uuidMaker = 0
+        uuidFile = directoryPath + '/uuidDirectory' + '.txt'
+        if (os.path.exists(uuidFile)):
+            os.remove(uuidFile)
         for i in self.links:
             try:
                 page = wikipedia.page(i, auto_suggest=False)
@@ -146,11 +147,12 @@ class TaskThread(QtCore.QThread):
                 page = wikipedia.page(e.options[0])
             summary = page.summary
             fullPage = page.content
-            htmlDoc = page.
-            forPathUse = i.replace('/', 'slashForReplacement')
-            for key in self.illegalChar:
-                forPathUse = forPathUse.replace(key, self.illegalChar[key])
-
+            htmlDoc = page.html()
+            forPathUse = str(uuidMaker)
+            uuidMaker += 1
+            with open(uuidFile,'a') as uuidMakerFile:
+                uuidMakerFile.write(page.title + '\n')
+                uuidMakerFile.close()
             ## image checkbox check
             if(self.picturesCheck):
                 images = page.images
@@ -158,36 +160,42 @@ class TaskThread(QtCore.QThread):
                 imgFolder = imagesPath + '/' + forPathUse
                 if not os.path.exists(imgFolder):
                     os.mkdir(imgFolder)
-                    for a in images:
-                        if isinstance(a, str):
-                            fileName = a.split('/')[-1]
-                            print(fileName)
-                            if fileName.split('.')[-1] in self.imgTypes:
-                                headers = {
-                                    'User-Agent': 'EvanCategoryWikiBot/2.0 (boomandot@gmail.com; coolbot@example.org)'}
-                                try:
-                                    with open(tempImagesPath + '/' + fileName, 'wb') as f:
-                                        r = requests.get(a, stream=True, headers=headers)
-                                        r.raw.decode_content = True
-                                        if (r.status_code == 200):
-                                            shutil.copyfileobj(r.raw, f)
-                                    f.close()
-                                except OSError as e:
-                                    print(e)
+                    imgCount = 0
+                    imgDirectoryManagerFile = imgFolder + '/' +forPathUse + '.txt'
+                    with open(imgDirectoryManagerFile,'w') as g:
+                        for a in images:
+                            if isinstance(a, str):
+                                if('Red_Pencil_Icon.png' and 'Double-dagger-14-plain.png' not in a):
+                                    fileName = a.split('/')[-1]
+                                    if fileName.split('.')[-1] in self.imgTypes:
+                                        headers = {
+                                            'User-Agent': 'EvanCategoryWikiBot/2.0 (boomandot@gmail.com; coolbot@example.org)'}
+                                        try:
+                                            with open(tempImagesPath + '/' + str(imgCount) + '.' + fileName.split('.')[-1], 'wb') as f:
+                                                r = requests.get(a, stream=True, headers=headers)
+                                                r.raw.decode_content = True
+                                                if (r.status_code == 200):
+                                                    shutil.copyfileobj(r.raw, f)
+                                                    g.write(a + '\n')
+                                                    imgCount += 1
+                                            f.close()
+                                        except OSError as e:
+                                            print(e)
+                    g.close()
 
             tempSummaryPath = summaryPath + '/' + forPathUse + '.txt'
             tempFullPagePath = fullPagePath + '/' + forPathUse + '.txt'
             tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
             with open(tempSummaryPath, 'w') as f:
                 f.write(ascii(summary))
-                f.close()
-            with open(tempFullPagePath, 'w') as f:
-                f.write(ascii(fullPage))
-                f.close()
-                self.progress.emit(1)
-
-
-
+                f.close()                          
+            with open(tempHTMLPath, 'w') as f:
+                f.write(ascii(htmlDoc))
+                f.close()                                     
+            with open(tempFullPagePath, 'w') as f: 
+                f.write(ascii(fullPage))           
+                f.close()                          
+                self.progress.emit(1)              
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     myApp = WikipediaLinkGetter()

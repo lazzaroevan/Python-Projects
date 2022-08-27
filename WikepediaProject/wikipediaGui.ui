@@ -65,7 +65,7 @@
        <string>Links to all the wikipedia pages that will be downloaded along with the initial one</string>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="tab_3">
        <attribute name="title">
