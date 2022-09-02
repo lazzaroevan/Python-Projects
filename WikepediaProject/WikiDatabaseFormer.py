@@ -4,14 +4,15 @@ import sys
 from time import sleep
 import requests
 import wikipedia
+from wikipedia import exceptions
 from pathlib import Path
 from PyQt6 import uic
 from PyQt6.QtCore import QObject, pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
-from PyQt6.QtWidgets import QApplication, QWidget, QDialog, QFileDialog
+from PyQt6.QtWidgets import QApplication, QWidget, QDialog, QFileDialog,QMainWindow
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-class WikipediaLinkGetter(QWidget):
+class WikipediaLinkGetter(QMainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi("wikipediaGui.ui",self)
@@ -30,7 +31,7 @@ class WikipediaLinkGetter(QWidget):
         numLinks = len(self.links)
         print(numLinks)
         self.progressBar.setRange(0, numLinks)
-        self.thread = TaskThread(self.links,self.filePathLabel.text(),self.picturesCheck.isChecked())
+        self.thread = TaskThread(self.links,self.filePathLabel.text() + '/' +self.searchTerm.text().upper(),self.picturesCheck.isChecked())
         self.thread.moveToThread(self.thread)
         self.thread.started.connect(self.thread.run)
         self.thread.progress.connect(self.progressBarUp)
@@ -67,7 +68,7 @@ class WikipediaLinkGetter(QWidget):
                     searchText = self.disambigApp.searchText
                     page = wikipedia.page(searchText)
                 if isinstance(page,wikipedia.WikipediaPage):
-                    summary = page.title+': ' +page.summary
+                    summary = page.title +': ' +page.summary
                     self.links = page.links
             except SystemExit:
                 print("Exited")
@@ -113,6 +114,7 @@ class DisambiguationPage(QDialog):
 class TaskThread(QtCore.QThread):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
+
     def __init__(self,links,filePath,imageCheck):
         QtCore.QThread.__init__(self,parent=None)
         self.links = links
@@ -121,12 +123,20 @@ class TaskThread(QtCore.QThread):
     def progressEmit(self):
         self.progress.emit(1)
 
+    def downloadPage(self):
+        pass
+
     def run(self):
         directoryPath = self.filePath
         summaryPath = directoryPath + "/summary"
         imagesPath = directoryPath + "/images"
         fullPagePath = directoryPath + "/fullPage"
         htmlPath = directoryPath + "/HTML"
+        secondLinks = []
+        progressLink = []
+        pageList = []
+        if not os.path.exists(directoryPath):
+            os.mkdir(directoryPath)
         if not os.path.exists(summaryPath):
             os.mkdir(summaryPath)
         if not os.path.exists(htmlPath):
@@ -140,22 +150,38 @@ class TaskThread(QtCore.QThread):
         uuidFile = directoryPath + '/uuidDirectory' + '.txt'
         if (os.path.exists(uuidFile)):
             os.remove(uuidFile)
-        for i in self.links:
+        for i in range(len(self.links)):
             try:
-                page = wikipedia.page(i, auto_suggest=False)
+                page = wikipedia.page(self.links[i], auto_suggest=False)
             except wikipedia.DisambiguationError as e:
                 page = wikipedia.page(e.options[0])
-            summary = page.summary
-            fullPage = page.content
-            htmlDoc = page.html()
+            pageList.append(page)
+            progressLink.append(self.links[i])
+            for x in page.links:
+                try:
+                    page = wikipedia.page(x, auto_suggest=False)
+                except wikipedia.DisambiguationError as e:
+                    page = wikipedia.page(e.options[0])
+                except exceptions.PageError:
+                    page = wikipedia.page()
+                pageList.append(page) 
+            self.progress.emit(1)
+
+        for i in pageList:
+            summary = i.summary
+            fullPage = i.content
+            htmlDoc = i.html()
             forPathUse = str(uuidMaker)
             uuidMaker += 1
             with open(uuidFile,'a') as uuidMakerFile:
-                uuidMakerFile.write(page.title + '\n')
+                title = i.title
+                if ('\\r' in title):
+                    title = title.replace('\\', '')
+                uuidMakerFile.write(title + '\n')
                 uuidMakerFile.close()
             ## image checkbox check
             if(self.picturesCheck):
-                images = page.images
+                images = i.images
                 tempImagesPath = imagesPath + '/' + forPathUse
                 imgFolder = imagesPath + '/' + forPathUse
                 if not os.path.exists(imgFolder):
@@ -188,14 +214,13 @@ class TaskThread(QtCore.QThread):
             tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
             with open(tempSummaryPath, 'w') as f:
                 f.write(ascii(summary))
-                f.close()                          
+                f.close()
             with open(tempHTMLPath, 'w') as f:
                 f.write(ascii(htmlDoc))
-                f.close()                                     
-            with open(tempFullPagePath, 'w') as f: 
-                f.write(ascii(fullPage))           
-                f.close()                          
-                self.progress.emit(1)              
+                f.close()
+            with open(tempFullPagePath, 'w') as f:
+                f.write(ascii(fullPage))
+                f.close()
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     myApp = WikipediaLinkGetter()
