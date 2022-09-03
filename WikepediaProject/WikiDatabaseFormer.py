@@ -134,7 +134,6 @@ class TaskThread(QtCore.QThread):
         htmlPath = directoryPath + "/HTML"
         secondLinks = []
         progressLink = []
-        pageList = []
         if not os.path.exists(directoryPath):
             os.mkdir(directoryPath)
         if not os.path.exists(summaryPath):
@@ -151,6 +150,7 @@ class TaskThread(QtCore.QThread):
         if (os.path.exists(uuidFile)):
             os.remove(uuidFile)
         for i in range(len(self.links)):
+            pageList = []
             try:
                 page = wikipedia.page(self.links[i], auto_suggest=False)
             except wikipedia.DisambiguationError as e:
@@ -163,64 +163,69 @@ class TaskThread(QtCore.QThread):
                 except wikipedia.DisambiguationError as e:
                     page = wikipedia.page(e.options[0])
                 except exceptions.PageError:
-                    page = wikipedia.page()
-                pageList.append(page) 
+                    page = wikipedia.page('Error')
+                pageList.append(page)
+            for i in pageList:
+                summary = i.summary
+                fullPage = i.content
+                htmlDoc = i.html()
+                forPathUse = str(uuidMaker)
+                uuidMaker += 1
+                with open(uuidFile, 'a') as uuidMakerFile:
+                    title = i.title
+                    if ('\\r' in title):
+                        title = title.replace('\\', '')
+                    uuidMakerFile.write(title + '\n')
+                    uuidMakerFile.close()
+                ## image checkbox check
+                if (self.picturesCheck):
+                    try:
+                        images = i.images
+                        tempImagesPath = imagesPath + '/' + forPathUse
+                        imgFolder = imagesPath + '/' + forPathUse
+                        if not os.path.exists(imgFolder):
+                            os.mkdir(imgFolder)
+                            imgCount = 0
+                            imgDirectoryManagerFile = imgFolder + '/' + forPathUse + '.txt'
+                            with open(imgDirectoryManagerFile, 'w') as g:
+                                for a in images:
+                                    if isinstance(a, str):
+                                        if ('Red_Pencil_Icon.png' and 'Double-dagger-14-plain.png' not in a):
+                                            fileName = a.split('/')[-1]
+                                            if fileName.split('.')[-1] in self.imgTypes:
+                                                headers = {
+                                                    'User-Agent': 'EvanCategoryWikiBot/2.0 (boomandot@gmail.com; coolbot@example.org)'}
+                                                try:
+                                                    with open(tempImagesPath + '/' + str(imgCount) + '.' +
+                                                              fileName.split('.')[-1], 'wb') as f:
+                                                        r = requests.get(a, stream=True, headers=headers)
+                                                        r.raw.decode_content = True
+                                                        if (r.status_code == 200):
+                                                            shutil.copyfileobj(r.raw, f)
+                                                            g.write(a + '\n')
+                                                            imgCount += 1
+                                                    f.close()
+                                                except OSError as e:
+                                                    print(e)
+                            g.close()
+                    except KeyError as e:
+                        print(e)
+
+                tempSummaryPath = summaryPath + '/' + forPathUse + '.txt'
+                tempFullPagePath = fullPagePath + '/' + forPathUse + '.txt'
+                tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
+                with open(tempSummaryPath, 'w') as f:
+                    f.write(ascii(summary))
+                    f.close()
+                with open(tempHTMLPath, 'w') as f:
+                    f.write(ascii(htmlDoc))
+                    f.close()
+                with open(tempFullPagePath, 'w') as f:
+                    f.write(ascii(fullPage))
+                    f.close()
             self.progress.emit(1)
 
-        for i in pageList:
-            summary = i.summary
-            fullPage = i.content
-            htmlDoc = i.html()
-            forPathUse = str(uuidMaker)
-            uuidMaker += 1
-            with open(uuidFile,'a') as uuidMakerFile:
-                title = i.title
-                if ('\\r' in title):
-                    title = title.replace('\\', '')
-                uuidMakerFile.write(title + '\n')
-                uuidMakerFile.close()
-            ## image checkbox check
-            if(self.picturesCheck):
-                images = i.images
-                tempImagesPath = imagesPath + '/' + forPathUse
-                imgFolder = imagesPath + '/' + forPathUse
-                if not os.path.exists(imgFolder):
-                    os.mkdir(imgFolder)
-                    imgCount = 0
-                    imgDirectoryManagerFile = imgFolder + '/' +forPathUse + '.txt'
-                    with open(imgDirectoryManagerFile,'w') as g:
-                        for a in images:
-                            if isinstance(a, str):
-                                if('Red_Pencil_Icon.png' and 'Double-dagger-14-plain.png' not in a):
-                                    fileName = a.split('/')[-1]
-                                    if fileName.split('.')[-1] in self.imgTypes:
-                                        headers = {
-                                            'User-Agent': 'EvanCategoryWikiBot/2.0 (boomandot@gmail.com; coolbot@example.org)'}
-                                        try:
-                                            with open(tempImagesPath + '/' + str(imgCount) + '.' + fileName.split('.')[-1], 'wb') as f:
-                                                r = requests.get(a, stream=True, headers=headers)
-                                                r.raw.decode_content = True
-                                                if (r.status_code == 200):
-                                                    shutil.copyfileobj(r.raw, f)
-                                                    g.write(a + '\n')
-                                                    imgCount += 1
-                                            f.close()
-                                        except OSError as e:
-                                            print(e)
-                    g.close()
 
-            tempSummaryPath = summaryPath + '/' + forPathUse + '.txt'
-            tempFullPagePath = fullPagePath + '/' + forPathUse + '.txt'
-            tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
-            with open(tempSummaryPath, 'w') as f:
-                f.write(ascii(summary))
-                f.close()
-            with open(tempHTMLPath, 'w') as f:
-                f.write(ascii(htmlDoc))
-                f.close()
-            with open(tempFullPagePath, 'w') as f:
-                f.write(ascii(fullPage))
-                f.close()
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     myApp = WikipediaLinkGetter()
