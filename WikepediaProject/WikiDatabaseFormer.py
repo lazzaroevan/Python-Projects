@@ -42,8 +42,10 @@ class WikipediaLinkGetter(QMainWindow):
         self.thread.start()
 
     def littleProgress(self,tuple):
-        link = self.self.listOfLinksBox[tuple[2]]
-        link.setText(link.text() + 'Sublinks: ' + str(tuple[0]) + '/' + str(tuple[1]))
+        link = self.listOfLinksBox.itemAt(0,tuple[2])
+        link.setText(link.text() + ':')
+        name = link.text().split(':')[0] + ': Sublinks: ' + str(tuple[0]+1) + '/' + str(tuple[1])
+        link.setText(name)
     def progressBarUp(self,num):
         brush = QBrush()
         brush.setColor(QColor.fromRgb(0, 255, 0))
@@ -119,6 +121,7 @@ class TaskThread(QtCore.QThread):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
     littleProgress = pyqtSignal(tuple)
+    saveProgress = pyqtSignal(tuple)
 
     def __init__(self,links,filePath,imageCheck):
         QtCore.QThread.__init__(self,parent=None)
@@ -169,7 +172,7 @@ class TaskThread(QtCore.QThread):
                 except exceptions.PageError:
                     page = wikipedia.page('Error')
                 pageList.append(page)
-                self.littleProgress.emit((newPageLinks.index(x),len(newPageLinks,i)))
+                self.littleProgress.emit((newPageLinks.index(x),len(newPageLinks),i))
             for i in pageList:
                 summary = i.summary
                 fullPage = i.content
