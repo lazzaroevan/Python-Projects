@@ -15,7 +15,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class WikipediaLinkGetter(QMainWindow):
     def __init__(self):
         super().__init__()
-        uic.loadUi("wikipediaGui.ui",self)
+        uic.loadUi("guis/wikipediaGui.ui",self)
         self.setWindowTitle("Wikipedia Link Getter")
         self.tryWikipediaSearchButton.clicked.connect(self.searchWikipedia)
         self.saveDirectoryButton.clicked.connect(self.browseFiles)
@@ -37,16 +37,19 @@ class WikipediaLinkGetter(QMainWindow):
         self.thread.progress.connect(self.progressBarUp)
         self.thread.finished.connect(self.thread.quit)
         self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.littleProgress.connect(self.littleProgress)
 
         self.thread.start()
 
+    def littleProgress(self,tuple):
+        self.progressTracker.setText('Sublinks: ' + str(tuple[0]) + '/' + str(tuple[1]))
     def progressBarUp(self,num):
         brush = QBrush()
         brush.setColor(QColor.fromRgb(0, 255, 0))
         brush.setStyle(Qt.BrushStyle.SolidPattern)
         self.listOfLinksBox.item(self.progressBar.value()).setBackground(brush)
         self.progressBar.setValue(num + int(self.progressBar.value()))
-        self.progressTracker.setText(str(self.progressBar.value())+'/'+str(len(self.links)))
+
 
     def searchWikipedia(self):
         self.listOfLinksBox.clear()
@@ -94,7 +97,7 @@ class DisambiguationPage(QDialog):
         self.searchText = "Apple"
         self.complete = False
         super().__init__(parent)
-        uic.loadUi("disambiguationPage.ui",self)
+        uic.loadUi("guis/disambiguationPage.ui",self)
         self.select.clicked.connect(self.buttonPressed)
         for i in otherPages:
             self.pagesDict[i]=QtWidgets.QRadioButton(self.scrollAreaWidgetContents_7)
@@ -114,14 +117,13 @@ class DisambiguationPage(QDialog):
 class TaskThread(QtCore.QThread):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
+    littleProgress = pyqtSignal(tuple)
 
     def __init__(self,links,filePath,imageCheck):
         QtCore.QThread.__init__(self,parent=None)
         self.links = links
         self.filePath = filePath
         self.picturesCheck = imageCheck
-    def progressEmit(self):
-        self.progress.emit(1)
 
     def downloadPage(self):
         pass
@@ -157,7 +159,8 @@ class TaskThread(QtCore.QThread):
                 page = wikipedia.page(e.options[0])
             pageList.append(page)
             progressLink.append(self.links[i])
-            for x in page.links:
+            newPageLinks = page.links
+            for x in newPageLinks:
                 try:
                     page = wikipedia.page(x, auto_suggest=False)
                 except wikipedia.DisambiguationError as e:
@@ -165,6 +168,7 @@ class TaskThread(QtCore.QThread):
                 except exceptions.PageError:
                     page = wikipedia.page('Error')
                 pageList.append(page)
+                self.littleProgress.emit((newPageLinks.index(x),len(newPageLinks)))
             for i in pageList:
                 summary = i.summary
                 fullPage = i.content
