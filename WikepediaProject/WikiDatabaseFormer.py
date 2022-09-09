@@ -1,16 +1,15 @@
 import os
 import shutil
 import sys
-from time import sleep
 import requests
 import wikipedia
 from wikipedia import exceptions
-from pathlib import Path
 from PyQt6 import uic
-from PyQt6.QtCore import QObject, pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor
-from PyQt6.QtWidgets import QApplication, QWidget, QDialog, QFileDialog,QMainWindow
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog,QMainWindow
+from PyQt6 import QtCore, QtWidgets
+import webbrowser
 
 class WikipediaLinkGetter(QMainWindow):
     def __init__(self):
@@ -20,6 +19,7 @@ class WikipediaLinkGetter(QMainWindow):
         self.tryWikipediaSearchButton.clicked.connect(self.searchWikipedia)
         self.saveDirectoryButton.clicked.connect(self.browseFiles)
         self.saveFilesButton.clicked.connect(self.saveDatabase)
+        self.listOfLinksBox.itemDoubleClicked.connect(self.openBrowser)
 
     def browseFiles(self):
         home_dir = str(os.getcwd())
@@ -38,21 +38,31 @@ class WikipediaLinkGetter(QMainWindow):
         self.thread.finished.connect(self.thread.quit)
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.littleProgress.connect(self.littleProgress)
+        self.thread.saveProgress.connect(self.saveFileProgress)
 
         self.thread.start()
 
     def littleProgress(self,tuple):
-        link = self.listOfLinksBox.itemAt(0,tuple[2])
-        link.setText(link.text() + ':')
-        name = link.text().split(':')[0] + ': Sublinks: ' + str(tuple[0]+1) + '/' + str(tuple[1])
-        link.setText(name)
+        link = self.listOfLinksBox.findItems(tuple[2],Qt.MatchFlag.MatchExactly)
+        for i in link:
+            i.setText(i.text() + ':')
+            name = i.text().split(':')[0] + ': Sublinks: ' + str(tuple[0]) + '/' + str(tuple[1])
+            i.setText(name)
+
     def progressBarUp(self,num):
+        self.progressTracker.setText(str(num) + len(self.links))
         brush = QBrush()
         brush.setColor(QColor.fromRgb(0, 255, 0))
         brush.setStyle(Qt.BrushStyle.SolidPattern)
         self.listOfLinksBox.item(self.progressBar.value()).setBackground(brush)
         self.progressBar.setValue(num + int(self.progressBar.value()))
 
+    def saveFileProgress(self,tuple):
+        link = self.listOfLinksBox.findItems(tuple[2],Qt.MatchFlag.MatchExactly)
+        for i in link:
+            i.setText(link.text() + ':')
+            name = i.text().split(':')[0] + ': Saving links: ' + str(tuple[0]) + '/' + str(tuple[1])
+            i.setText(name)
 
     def searchWikipedia(self):
         self.listOfLinksBox.clear()
@@ -93,6 +103,11 @@ class WikipediaLinkGetter(QMainWindow):
         for i in self.links:
             self.listOfLinksBox.addItem(i)
         self.summaryTextBox.setText(summary)
+
+    def openBrowser(self,qlistItem):
+        url = 'https://en.wikipedia.org/wiki/'
+        url = url + qlistItem.text()
+        webbrowser.open(url)
 
 class DisambiguationPage(QDialog):
     def __init__(self, otherPages, parent = None):
@@ -172,23 +187,23 @@ class TaskThread(QtCore.QThread):
                 except exceptions.PageError:
                     page = wikipedia.page('Error')
                 pageList.append(page)
-                self.littleProgress.emit((newPageLinks.index(x),len(newPageLinks),i))
-            for i in pageList:
-                summary = i.summary
-                fullPage = i.content
-                htmlDoc = i.html()
+                self.littleProgress.emit((newPageLinks.index(x)+1,len(newPageLinks),self.links[i]))
+            for d in range(len(pageList)):
+                summary = pageList[d].summary
+                fullPage =  pageList[d].content
+                htmlDoc =  pageList[d].html()
                 forPathUse = str(uuidMaker)
                 uuidMaker += 1
                 with open(uuidFile, 'a') as uuidMakerFile:
-                    title = i.title
-                    if ('\\r' in title):
-                        title = title.replace('\\', '')
+                    title =  pageList[d].title
+                    if ('\r\n' in title):
+                        title = title.replace('\r\n', '')
                     uuidMakerFile.write(title + '\n')
                     uuidMakerFile.close()
                 ## image checkbox check
                 if (self.picturesCheck):
                     try:
-                        images = i.images
+                        images =  pageList[d].images
                         tempImagesPath = imagesPath + '/' + forPathUse
                         imgFolder = imagesPath + '/' + forPathUse
                         if not os.path.exists(imgFolder):
@@ -231,6 +246,7 @@ class TaskThread(QtCore.QThread):
                 with open(tempFullPagePath, 'w') as f:
                     f.write(ascii(fullPage))
                     f.close()
+                self.saveProgress.emit((d+1,len(pageList),self.links[i]))
             self.progress.emit(1)
 
 
