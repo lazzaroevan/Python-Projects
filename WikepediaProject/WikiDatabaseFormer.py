@@ -6,7 +6,7 @@ import wikipedia
 from wikipedia import exceptions
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QBrush, QColor
+from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog,QMainWindow
 from PyQt6 import QtCore, QtWidgets
 import webbrowser
@@ -20,12 +20,14 @@ class WikipediaLinkGetter(QMainWindow):
         self.saveDirectoryButton.clicked.connect(self.browseFiles)
         self.saveFilesButton.clicked.connect(self.saveDatabase)
         self.listOfLinksBox.itemDoubleClicked.connect(self.openBrowser)
+        self.setStyleSheet("font-size: 12pt")
 
     def browseFiles(self):
         home_dir = str(os.getcwd())
         fname = QFileDialog.getExistingDirectory(self, 'Select Directory', home_dir)
         self.filePathLabel.setText(fname)
         self.filePathLabel.setToolTip(fname)
+        self.saveFilesButton.setEnabled(True)
 
     def saveDatabase(self):
         numLinks = len(self.links)
@@ -43,7 +45,11 @@ class WikipediaLinkGetter(QMainWindow):
         self.thread.start()
 
     def littleProgress(self,tuple):
-        link = self.listOfLinksBox.findItems(tuple[2],Qt.MatchFlag.MatchExactly)
+        linkWithEnder = tuple[2] + ': Sublinks: ' + str(tuple[0]-1) + '/' + str(tuple[1])
+        if(tuple[0] == 1):
+            link = self.listOfLinksBox.findItems(tuple[2],Qt.MatchFlag.MatchExactly)
+        else:
+            link = self.listOfLinksBox.findItems(linkWithEnder,Qt.MatchFlag.MatchExactly)
         for i in link:
             i.setText(i.text() + ':')
             name = i.text().split(':')[0] + ': Sublinks: ' + str(tuple[0]) + '/' + str(tuple[1])
@@ -58,9 +64,13 @@ class WikipediaLinkGetter(QMainWindow):
         self.progressBar.setValue(num + int(self.progressBar.value()))
 
     def saveFileProgress(self,tuple):
-        link = self.listOfLinksBox.findItems(tuple[2],Qt.MatchFlag.MatchExactly)
+        linkWithEnder = tuple[2] + ': Sublinks: ' + str(tuple[0] - 1) + '/' + str(tuple[1])
+        if (tuple[0] == 1):
+            link = self.listOfLinksBox.findItems(tuple[2], Qt.MatchFlag.MatchExactly)
+        else:
+            link = self.listOfLinksBox.findItems(linkWithEnder, Qt.MatchFlag.MatchExactly)
         for i in link:
-            i.setText(link.text() + ':')
+            i.setText(i.text() + ':')
             name = i.text().split(':')[0] + ': Saving links: ' + str(tuple[0]) + '/' + str(tuple[1])
             i.setText(name)
 
@@ -82,7 +92,8 @@ class WikipediaLinkGetter(QMainWindow):
                     self.isComplete = True
                     self.disambigApp.exec()
                     searchText = self.disambigApp.searchText
-                    page = wikipedia.page(searchText)
+                    self.searchTerm.setText(searchText)
+                    page = wikipedia.page(searchText,auto_suggest=False)
                 if isinstance(page,wikipedia.WikipediaPage):
                     summary = page.title +': ' +page.summary
                     self.links = page.links
@@ -91,19 +102,20 @@ class WikipediaLinkGetter(QMainWindow):
                 self.isComplete = False
                 firstAttempt = True
             except wikipedia.DisambiguationError as e:
-                print("DisambigError: "+ searchText)
+                print("Disambiguation Error: "+ searchText)
                 print(e)
                 newPages = e.options
                 self.disambigApp = DisambiguationPage(newPages, parent=self)
                 self.isComplete = False
             except wikipedia.exceptions.WikipediaException:
-                print("SearchIsBusy")
+                print("Spelling Error?")
+                newPages = wikipedia.search(wikipedia.suggest(searchText))
+                self.disambigApp = DisambiguationPage(newPages, parent=self)
                 self.isComplete = False
-                firstAttempt = True
         for i in self.links:
             self.listOfLinksBox.addItem(i)
         self.summaryTextBox.setText(summary)
-
+        self.saveDirectoryButton.setEnabled(True)
     def openBrowser(self,qlistItem):
         url = 'https://en.wikipedia.org/wiki/'
         url = url + qlistItem.text()
@@ -118,7 +130,7 @@ class DisambiguationPage(QDialog):
         uic.loadUi("guis/disambiguationPage.ui",self)
         self.select.clicked.connect(self.buttonPressed)
         for i in otherPages:
-            self.pagesDict[i]=QtWidgets.QRadioButton(self.scrollAreaWidgetContents_7)
+            self.pagesDict[i] = QtWidgets.QRadioButton(self.scrollAreaWidgetContents_7)
             self.pagesDict[i].setMinimumSize(QtCore.QSize(89, 20))
             self.pagesDict[i].setText(i)
             self.pagesDict[i].setObjectName(i)
@@ -128,7 +140,7 @@ class DisambiguationPage(QDialog):
         for i in self.pagesDict:
             if self.pagesDict[i].isChecked():
                 self.searchText = i
-                self.complete=True
+                self.complete = True
                 self.accept()
         self.reject()
 
@@ -194,7 +206,7 @@ class TaskThread(QtCore.QThread):
                 htmlDoc =  pageList[d].html()
                 forPathUse = str(uuidMaker)
                 uuidMaker += 1
-                with open(uuidFile, 'a') as uuidMakerFile:
+                with open(uuidFile, 'a',encoding="utf-8") as uuidMakerFile:
                     title =  pageList[d].title
                     if ('\r\n' in title):
                         title = title.replace('\r\n', '')
