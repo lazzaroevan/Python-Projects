@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="WikiDatabaseFormer" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+  <configuration default="false" name="WikiDatabaseFormer" type="PythonConfigurationType" factoryName="Python" singleton="false" nameIsGenerated="true">
     <module name="Python-Projects" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
-    <option name="SDK_HOME" value="C:\Users\lazza\AppData\Local\Programs\Python\Python39\python.exe" />
+    <option name="SDK_HOME" value="C:\Users\lazza\AppData\Local\Microsoft\WindowsApps\python3.10.exe" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/WikepediaProject" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />

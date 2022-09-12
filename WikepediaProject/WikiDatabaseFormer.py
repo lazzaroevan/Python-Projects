@@ -7,7 +7,7 @@ from wikipedia import exceptions
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QBrush, QColor, QFont
-from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog,QMainWindow
+from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog, QMainWindow, QAbstractItemView
 from PyQt6 import QtCore, QtWidgets
 import webbrowser
 
@@ -20,6 +20,7 @@ class WikipediaLinkGetter(QMainWindow):
         self.saveDirectoryButton.clicked.connect(self.browseFiles)
         self.saveFilesButton.clicked.connect(self.saveDatabase)
         self.listOfLinksBox.itemDoubleClicked.connect(self.openBrowser)
+        self.listOfLinksBox.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setStyleSheet("font-size: 12pt")
 
     def browseFiles(self):
@@ -33,7 +34,7 @@ class WikipediaLinkGetter(QMainWindow):
         numLinks = len(self.links)
         print(numLinks)
         self.progressBar.setRange(0, numLinks)
-        self.thread = TaskThread(self.links,self.filePathLabel.text() + '/' +self.searchTerm.text().upper(),self.picturesCheck.isChecked())
+        self.thread = TaskThread(self.links,self.filePathLabel.text() + '/' +self.searchTerm.text().upper(),self.picturesCheck.isChecked(),self.listOfLinksBox)
         self.thread.moveToThread(self.thread)
         self.thread.started.connect(self.thread.run)
         self.thread.progress.connect(self.progressBarUp)
@@ -45,18 +46,13 @@ class WikipediaLinkGetter(QMainWindow):
         self.thread.start()
 
     def littleProgress(self,tuple):
-        linkWithEnder = tuple[2] + ': Sublinks: ' + str(tuple[0]-1) + '/' + str(tuple[1])
-        if(tuple[0] == 1):
-            link = self.listOfLinksBox.findItems(tuple[2],Qt.MatchFlag.MatchExactly)
-        else:
-            link = self.listOfLinksBox.findItems(linkWithEnder,Qt.MatchFlag.MatchExactly)
-        for i in link:
-            i.setText(i.text() + ':')
-            name = i.text().split(':')[0] + ': Sublinks: ' + str(tuple[0]) + '/' + str(tuple[1])
-            i.setText(name)
+        link = tuple[2]
+        link.setText(link.text() + ':')
+        name = link.text().split(':')[0] + ': Sublinks: ' + str(tuple[0]) + '/' + str(tuple[1])
+        link.setText(name)
 
     def progressBarUp(self,num):
-        self.progressTracker.setText(str(num) + len(self.links))
+        self.progressTracker.setText(str(int(self.progressTracker.text().split('/')[0])+1) + '/' + str(len(self.links)))
         brush = QBrush()
         brush.setColor(QColor.fromRgb(0, 255, 0))
         brush.setStyle(Qt.BrushStyle.SolidPattern)
@@ -64,20 +60,14 @@ class WikipediaLinkGetter(QMainWindow):
         self.progressBar.setValue(num + int(self.progressBar.value()))
 
     def saveFileProgress(self,tuple):
-        linkWithEnder = tuple[2] + ': Sublinks: ' + str(tuple[0] - 1) + '/' + str(tuple[1])
-        if (tuple[0] == 1):
-            link = self.listOfLinksBox.findItems(tuple[2], Qt.MatchFlag.MatchExactly)
-        else:
-            link = self.listOfLinksBox.findItems(linkWithEnder, Qt.MatchFlag.MatchExactly)
-        for i in link:
-            i.setText(i.text() + ':')
-            name = i.text().split(':')[0] + ': Saving links: ' + str(tuple[0]) + '/' + str(tuple[1])
-            i.setText(name)
+        link = tuple[2]
+        link.setText(link.text() + ':')
+        name = link.text().split(':')[0] + ': Saving links: ' + str(tuple[0]) + '/' + str(tuple[1])
+        link.setText(name)
 
     def searchWikipedia(self):
         self.listOfLinksBox.clear()
         searchText = self.searchTerm.text()
-        print(searchText)
         self.isComplete = False
         self.links = []
         summary = ''
@@ -116,6 +106,7 @@ class WikipediaLinkGetter(QMainWindow):
             self.listOfLinksBox.addItem(i)
         self.summaryTextBox.setText(summary)
         self.saveDirectoryButton.setEnabled(True)
+        self.progressTracker.setText(str(0) + '/' + str(len(self.links)))
     def openBrowser(self,qlistItem):
         url = 'https://en.wikipedia.org/wiki/'
         url = url + qlistItem.text()
@@ -150,23 +141,18 @@ class TaskThread(QtCore.QThread):
     littleProgress = pyqtSignal(tuple)
     saveProgress = pyqtSignal(tuple)
 
-    def __init__(self,links,filePath,imageCheck):
+    def __init__(self,links,filePath,imageCheck,linkBox):
         QtCore.QThread.__init__(self,parent=None)
         self.links = links
         self.filePath = filePath
         self.picturesCheck = imageCheck
+        self.linksBox = linkBox
 
-    def downloadPage(self):
-        pass
-
-    def run(self):
-        directoryPath = self.filePath
+    def downloadPage(self,directoryPath,wikiPage,uuid):
         summaryPath = directoryPath + "/summary"
         imagesPath = directoryPath + "/images"
         fullPagePath = directoryPath + "/fullPage"
         htmlPath = directoryPath + "/HTML"
-        secondLinks = []
-        progressLink = []
         if not os.path.exists(directoryPath):
             os.mkdir(directoryPath)
         if not os.path.exists(summaryPath):
@@ -178,6 +164,15 @@ class TaskThread(QtCore.QThread):
         if not os.path.exists(fullPagePath):
             os.mkdir(fullPagePath)
         self.imgTypes = ['bmp', 'jpeg', 'tiff', 'tif', '.gif', 'png', 'jpg']
+        summary = pageList[d].summary
+        fullPage = pageList[d].content
+        htmlDoc = pageList[d].html()
+        pass
+
+    def run(self):
+        directoryPath = self.filePath
+        secondLinks = []
+        progressLink = []
         uuidMaker = 0
         uuidFile = directoryPath + '/uuidDirectory' + '.txt'
         if (os.path.exists(uuidFile)):
@@ -199,11 +194,9 @@ class TaskThread(QtCore.QThread):
                 except exceptions.PageError:
                     page = wikipedia.page('Error')
                 pageList.append(page)
-                self.littleProgress.emit((newPageLinks.index(x)+1,len(newPageLinks),self.links[i]))
+                self.littleProgress.emit((newPageLinks.index(x)+1,len(newPageLinks),self.linksBox.item(i)))
             for d in range(len(pageList)):
-                summary = pageList[d].summary
-                fullPage =  pageList[d].content
-                htmlDoc =  pageList[d].html()
+                self.downloadPage(directoryPath,d,uuidMaker)
                 forPathUse = str(uuidMaker)
                 uuidMaker += 1
                 with open(uuidFile, 'a',encoding="utf-8") as uuidMakerFile:
@@ -258,7 +251,7 @@ class TaskThread(QtCore.QThread):
                 with open(tempFullPagePath, 'w') as f:
                     f.write(ascii(fullPage))
                     f.close()
-                self.saveProgress.emit((d+1,len(pageList),self.links[i]))
+                self.saveProgress.emit((d+1,len(pageList),self.linksBox.item(i)))
             self.progress.emit(1)
 
 
