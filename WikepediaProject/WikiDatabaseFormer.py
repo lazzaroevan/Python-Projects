@@ -149,6 +149,7 @@ class TaskThread(QtCore.QThread):
         self.linksBox = linkBox
 
     def downloadPage(self,directoryPath,wikiPage,uuid):
+        forPathUse = str(uuid)
         summaryPath = directoryPath + "/summary"
         imagesPath = directoryPath + "/images"
         fullPagePath = directoryPath + "/fullPage"
@@ -164,10 +165,54 @@ class TaskThread(QtCore.QThread):
         if not os.path.exists(fullPagePath):
             os.mkdir(fullPagePath)
         self.imgTypes = ['bmp', 'jpeg', 'tiff', 'tif', '.gif', 'png', 'jpg']
-        summary = pageList[d].summary
-        fullPage = pageList[d].content
-        htmlDoc = pageList[d].html()
-        pass
+        summary = wikiPage.summary
+        fullPage = wikiPage.content
+        htmlDoc = wikiPage.html()
+        tempSummaryPath = summaryPath + '/' + forPathUse + '.txt'
+        tempFullPagePath = fullPagePath + '/' + forPathUse + '.txt'
+        tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
+        with open(tempSummaryPath, 'w') as f:
+            f.write(ascii(summary))
+            f.close()
+        with open(tempHTMLPath, 'w') as f:
+            f.write(ascii(htmlDoc))
+            f.close()
+        with open(tempFullPagePath, 'w') as f:
+            f.write(ascii(fullPage))
+            f.close()
+        ## image checkbox check
+        if (self.picturesCheck):
+            try:
+                images = wikiPage.images
+                tempImagesPath = imagesPath + '/' + forPathUse
+                imgFolder = imagesPath + '/' + forPathUse
+                if not os.path.exists(imgFolder):
+                    os.mkdir(imgFolder)
+                    imgCount = 0
+                    imgDirectoryManagerFile = imgFolder + '/' + forPathUse + '.txt'
+                    with open(imgDirectoryManagerFile, 'w') as g:
+                        for a in images:
+                            if isinstance(a, str):
+                                if ('Red_Pencil_Icon.png' and 'Double-dagger-14-plain.png' not in a):
+                                    fileName = a.split('/')[-1]
+                                    if fileName.split('.')[-1] in self.imgTypes:
+                                        headers = {
+                                            'User-Agent': 'EvanCategoryWikiBot/2.0 (boomandot@gmail.com; coolbot@example.org)'}
+                                        try:
+                                            with open(tempImagesPath + '/' + str(imgCount) + '.' +
+                                                      fileName.split('.')[-1], 'wb') as f:
+                                                r = requests.get(a, stream=True, headers=headers)
+                                                r.raw.decode_content = True
+                                                if (r.status_code == 200):
+                                                    shutil.copyfileobj(r.raw, f)
+                                                    g.write(a + '\n')
+                                                    imgCount += 1
+                                            f.close()
+                                        except OSError as e:
+                                            print(e)
+                    g.close()
+            except KeyError as e:
+                print(e)
 
     def run(self):
         directoryPath = self.filePath
@@ -196,8 +241,7 @@ class TaskThread(QtCore.QThread):
                 pageList.append(page)
                 self.littleProgress.emit((newPageLinks.index(x)+1,len(newPageLinks),self.linksBox.item(i)))
             for d in range(len(pageList)):
-                self.downloadPage(directoryPath,d,uuidMaker)
-                forPathUse = str(uuidMaker)
+                self.downloadPage(directoryPath,pageList[d],uuidMaker)
                 uuidMaker += 1
                 with open(uuidFile, 'a',encoding="utf-8") as uuidMakerFile:
                     title =  pageList[d].title
@@ -205,52 +249,6 @@ class TaskThread(QtCore.QThread):
                         title = title.replace('\r\n', '')
                     uuidMakerFile.write(title + '\n')
                     uuidMakerFile.close()
-                ## image checkbox check
-                if (self.picturesCheck):
-                    try:
-                        images =  pageList[d].images
-                        tempImagesPath = imagesPath + '/' + forPathUse
-                        imgFolder = imagesPath + '/' + forPathUse
-                        if not os.path.exists(imgFolder):
-                            os.mkdir(imgFolder)
-                            imgCount = 0
-                            imgDirectoryManagerFile = imgFolder + '/' + forPathUse + '.txt'
-                            with open(imgDirectoryManagerFile, 'w') as g:
-                                for a in images:
-                                    if isinstance(a, str):
-                                        if ('Red_Pencil_Icon.png' and 'Double-dagger-14-plain.png' not in a):
-                                            fileName = a.split('/')[-1]
-                                            if fileName.split('.')[-1] in self.imgTypes:
-                                                headers = {
-                                                    'User-Agent': 'EvanCategoryWikiBot/2.0 (boomandot@gmail.com; coolbot@example.org)'}
-                                                try:
-                                                    with open(tempImagesPath + '/' + str(imgCount) + '.' +
-                                                              fileName.split('.')[-1], 'wb') as f:
-                                                        r = requests.get(a, stream=True, headers=headers)
-                                                        r.raw.decode_content = True
-                                                        if (r.status_code == 200):
-                                                            shutil.copyfileobj(r.raw, f)
-                                                            g.write(a + '\n')
-                                                            imgCount += 1
-                                                    f.close()
-                                                except OSError as e:
-                                                    print(e)
-                            g.close()
-                    except KeyError as e:
-                        print(e)
-
-                tempSummaryPath = summaryPath + '/' + forPathUse + '.txt'
-                tempFullPagePath = fullPagePath + '/' + forPathUse + '.txt'
-                tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
-                with open(tempSummaryPath, 'w') as f:
-                    f.write(ascii(summary))
-                    f.close()
-                with open(tempHTMLPath, 'w') as f:
-                    f.write(ascii(htmlDoc))
-                    f.close()
-                with open(tempFullPagePath, 'w') as f:
-                    f.write(ascii(fullPage))
-                    f.close()
                 self.saveProgress.emit((d+1,len(pageList),self.linksBox.item(i)))
             self.progress.emit(1)
 
