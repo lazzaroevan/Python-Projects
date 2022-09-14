@@ -253,7 +253,7 @@ class TaskThread(QtCore.QThread):
                 try:
                     page = wikipedia.page(x, auto_suggest=False)
                 except wikipedia.DisambiguationError as e:
-                    page = wikipedia.page(e.options[0])
+                    page = wikipedia.page(e.options[0]) #error throws here, I should compile a list of all disambig errors and then do them at the end when the user can pick which ones they want
                 except exceptions.PageError:
                     page = wikipedia.page('Error')
                 pageList.append(page)
