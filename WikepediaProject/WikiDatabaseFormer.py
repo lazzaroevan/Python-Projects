@@ -6,7 +6,7 @@ import wikipedia
 from wikipedia import exceptions
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QBrush, QColor, QFont
+from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog, QMainWindow, QAbstractItemView
 from PyQt6 import QtCore, QtWidgets
 import webbrowser
@@ -21,7 +21,8 @@ class WikipediaLinkGetter(QMainWindow):
         self.saveFilesButton.clicked.connect(self.saveDatabase)
         self.listOfLinksBox.itemDoubleClicked.connect(self.openBrowser)
         self.listOfLinksBox.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.setStyleSheet("font-size: 12pt")
+        self.startPage = None
+        self.setStyleSheet("font-size: 10pt")
 
     def browseFiles(self):
         home_dir = str(os.getcwd())
@@ -34,7 +35,7 @@ class WikipediaLinkGetter(QMainWindow):
         numLinks = len(self.links)
         print(numLinks)
         self.progressBar.setRange(0, numLinks)
-        self.thread = TaskThread(self.links,self.filePathLabel.text() + '/' +self.searchTerm.text().upper(),self.picturesCheck.isChecked(),self.listOfLinksBox)
+        self.thread = TaskThread(self.filePathLabel.text() + '/' +self.searchTerm.text().upper(),self.picturesCheck.isChecked(),self.listOfLinksBox,self.startPage)
         self.thread.moveToThread(self.thread)
         self.thread.started.connect(self.thread.run)
         self.thread.progress.connect(self.progressBarUp)
@@ -87,6 +88,7 @@ class WikipediaLinkGetter(QMainWindow):
                 if isinstance(page,wikipedia.WikipediaPage):
                     summary = page.title +': ' +page.summary
                     self.links = page.links
+                    self.startPage = page
             except SystemExit:
                 print("Exited")
                 self.isComplete = False
@@ -107,6 +109,7 @@ class WikipediaLinkGetter(QMainWindow):
         self.summaryTextBox.setText(summary)
         self.saveDirectoryButton.setEnabled(True)
         self.progressTracker.setText(str(0) + '/' + str(len(self.links)))
+
     def openBrowser(self,qlistItem):
         url = 'https://en.wikipedia.org/wiki/'
         url = url + qlistItem.text()
@@ -141,12 +144,13 @@ class TaskThread(QtCore.QThread):
     littleProgress = pyqtSignal(tuple)
     saveProgress = pyqtSignal(tuple)
 
-    def __init__(self,links,filePath,imageCheck,linkBox):
+    def __init__(self,filePath,imageCheck,linkBox,startPage):
         QtCore.QThread.__init__(self,parent=None)
-        self.links = links
+        self.links = []
         self.filePath = filePath
         self.picturesCheck = imageCheck
         self.linksBox = linkBox
+        self.startPage = startPage
 
     def downloadPage(self,directoryPath,wikiPage,uuid):
         forPathUse = str(uuid)
@@ -154,8 +158,7 @@ class TaskThread(QtCore.QThread):
         imagesPath = directoryPath + "/images"
         fullPagePath = directoryPath + "/fullPage"
         htmlPath = directoryPath + "/HTML"
-        if not os.path.exists(directoryPath):
-            os.mkdir(directoryPath)
+        linksPath = directoryPath + "/links"
         if not os.path.exists(summaryPath):
             os.mkdir(summaryPath)
         if not os.path.exists(htmlPath):
@@ -164,6 +167,8 @@ class TaskThread(QtCore.QThread):
             os.mkdir(imagesPath)
         if not os.path.exists(fullPagePath):
             os.mkdir(fullPagePath)
+        if not os.path.exists(linksPath):
+            os.mkdir(linksPath)
         self.imgTypes = ['bmp', 'jpeg', 'tiff', 'tif', '.gif', 'png', 'jpg']
         summary = wikiPage.summary
         fullPage = wikiPage.content
@@ -171,14 +176,19 @@ class TaskThread(QtCore.QThread):
         tempSummaryPath = summaryPath + '/' + forPathUse + '.txt'
         tempFullPagePath = fullPagePath + '/' + forPathUse + '.txt'
         tempHTMLPath = htmlPath + '/' + forPathUse + '.txt'
-        with open(tempSummaryPath, 'w') as f:
-            f.write(ascii(summary))
+        tempLinksPath = linksPath + '/' +forPathUse + '.txt'
+        with open(tempSummaryPath, 'w', encoding="utf-8") as f:
+            f.write((summary))
             f.close()
-        with open(tempHTMLPath, 'w') as f:
-            f.write(ascii(htmlDoc))
+        with open(tempLinksPath, 'w', encoding="utf-8") as f:
+            for link in wikiPage.links:
+                f.write((link))
             f.close()
-        with open(tempFullPagePath, 'w') as f:
-            f.write(ascii(fullPage))
+        with open(tempHTMLPath, 'w', encoding="utf-8") as f:
+            f.write((htmlDoc))
+            f.close()
+        with open(tempFullPagePath, 'w', encoding="utf-8") as f:
+            f.write((fullPage))
             f.close()
         ## image checkbox check
         if (self.picturesCheck):
@@ -216,20 +226,28 @@ class TaskThread(QtCore.QThread):
 
     def run(self):
         directoryPath = self.filePath
-        secondLinks = []
+        if not os.path.exists(directoryPath):
+            os.mkdir(directoryPath)
         progressLink = []
-        uuidMaker = 0
+        uuidMaker = 1
         uuidFile = directoryPath + '/uuidDirectory' + '.txt'
         if (os.path.exists(uuidFile)):
             os.remove(uuidFile)
-        for i in range(len(self.links)):
+        with open(uuidFile, 'a', encoding="utf-8") as uuidMakerFile:
+            title = self.startPage.title
+            uuidMakerFile.write(title + '\n')
+            uuidMakerFile.close()
+        self.downloadPage(directoryPath,self.startPage,0)
+        for mainLinkNum in range(self.linksBox.count()):
             pageList = []
             try:
-                page = wikipedia.page(self.links[i], auto_suggest=False)
+                linkItem = self.linksBox.item(mainLinkNum)
+                textPage = linkItem.text()
+                page = wikipedia.page(textPage, auto_suggest=False)
             except wikipedia.DisambiguationError as e:
                 page = wikipedia.page(e.options[0])
             pageList.append(page)
-            progressLink.append(self.links[i])
+            progressLink.append(textPage)
             newPageLinks = page.links
             for x in newPageLinks:
                 try:
@@ -239,7 +257,7 @@ class TaskThread(QtCore.QThread):
                 except exceptions.PageError:
                     page = wikipedia.page('Error')
                 pageList.append(page)
-                self.littleProgress.emit((newPageLinks.index(x)+1,len(newPageLinks),self.linksBox.item(i)))
+                self.littleProgress.emit((newPageLinks.index(x)+1,len(newPageLinks),linkItem))
             for d in range(len(pageList)):
                 self.downloadPage(directoryPath,pageList[d],uuidMaker)
                 uuidMaker += 1
@@ -249,7 +267,7 @@ class TaskThread(QtCore.QThread):
                         title = title.replace('\r\n', '')
                     uuidMakerFile.write(title + '\n')
                     uuidMakerFile.close()
-                self.saveProgress.emit((d+1,len(pageList),self.linksBox.item(i)))
+                self.saveProgress.emit((d+1,len(pageList),linkItem))
             self.progress.emit(1)
 
 
