@@ -23,6 +23,7 @@ class WikipediaLinkGetter(QMainWindow):
         self.listOfLinksBox.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.startPage = None
         self.setStyleSheet("font-size: 10pt")
+        self.disambigLinks = []
 
     def browseFiles(self):
         home_dir = str(os.getcwd())
@@ -35,7 +36,7 @@ class WikipediaLinkGetter(QMainWindow):
         numLinks = len(self.links)
         print(numLinks)
         self.progressBar.setRange(0, numLinks)
-        self.thread = TaskThread(self.filePathLabel.text() + '/' +self.searchTerm.text().upper(),self.picturesCheck.isChecked(),self.listOfLinksBox,self.startPage)
+        self.thread = TaskThread(self.filePathLabel.text() + '/' +self.searchTerm.text().upper(),self.picturesCheck.isChecked(),self.listOfLinksBox,self.startPage,self.disambigLinks)
         self.thread.moveToThread(self.thread)
         self.thread.started.connect(self.thread.run)
         self.thread.progress.connect(self.progressBarUp)
@@ -144,13 +145,15 @@ class TaskThread(QtCore.QThread):
     littleProgress = pyqtSignal(tuple)
     saveProgress = pyqtSignal(tuple)
 
-    def __init__(self,filePath,imageCheck,linkBox,startPage):
+    def __init__(self,filePath,imageCheck,linkBox,startPage,disambigList):
         QtCore.QThread.__init__(self,parent=None)
         self.links = []
         self.filePath = filePath
         self.picturesCheck = imageCheck
         self.linksBox = linkBox
         self.startPage = startPage
+        self.disambigList =  disambigList
+        self.disambig = False
 
     def downloadPage(self,directoryPath,wikiPage,uuid):
         forPathUse = str(uuid)
@@ -245,7 +248,7 @@ class TaskThread(QtCore.QThread):
                 textPage = linkItem.text()
                 page = wikipedia.page(textPage, auto_suggest=False)
             except wikipedia.DisambiguationError as e:
-                page = wikipedia.page(e.options[0])
+                page = wikipedia.page(e.options[0],auto_suggest=False)
             pageList.append(page)
             progressLink.append(textPage)
             newPageLinks = page.links
@@ -253,9 +256,11 @@ class TaskThread(QtCore.QThread):
                 try:
                     page = wikipedia.page(x, auto_suggest=False)
                 except wikipedia.DisambiguationError as e:
-                    page = wikipedia.page(e.options[0]) #error throws here, I should compile a list of all disambig errors and then do them at the end when the user can pick which ones they want
+                    self.disambigList.append(x)
+                    self.disambig = True
+                    page = wikipedia.page("Word-sense_disambiguation",auto_suggest=False) #error throws here, I should compile a list of all disambig errors and then do them at the end when the user can pick which ones they want
                 except exceptions.PageError:
-                    page = wikipedia.page('Error')
+                    page = wikipedia.page('Error',auto_suggest=False)
                 pageList.append(page)
                 self.littleProgress.emit((newPageLinks.index(x)+1,len(newPageLinks),linkItem))
             for d in range(len(pageList)):
